@@ -1,0 +1,145 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <gmp.h>
+#include "linklist.h"
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <unistd.h>
+#include <pthread.h>
+#include "my_semaphore.h"
+ 
+#define ONETIMESIZE 50
+#define SLEEPTIME 100000
+
+Ndata ndata[ONETIMESIZE];
+int sem_consumer;
+int sem_producer;
+int sem_producerleft;
+int sem_consumerleft;
+
+void get_str(char **str);
+void my_fgets(char *str, int size);
+int bits_10baseofnumber(int n);
+void* shmgetdata(void* args);
+void* shmgetdataleft(void* args);
+
+typedef struct {
+    mpz_t n;
+    mpz_t g;
+    mpz_t hs;
+    struct rawdata* rdata;
+}MySql_args;
+
+int main(){
+    sem_consumer = semget(0x6600, 1, 0660|IPC_CREAT);     //  返回信号量标识号；若信号量不存在则创建
+    my_sem_init(sem_consumer, 1);                            //  将消费者信号量初始化为可用 
+    sem_producer = semget(0x6500, 0, 0);                  //  获取生产者信号量标识
+    
+    sem_consumerleft = semget(0x6800, 1, 0660|IPC_CREAT);
+    my_sem_init(sem_consumerleft, 1);
+    sem_producerleft = semget(0x6700, 0, 0);
+
+    pthread_t th_shm, th_shmlt;
+
+    pthread_create(&th_shm, NULL, shmgetdata, NULL);
+    pthread_create(&th_shmlt, NULL, shmgetdataleft, NULL);
+
+    pthread_join(th_shm, NULL);
+    pthread_join(th_shmlt, NULL);
+
+    // my_sem_destroy(sem_consumer);
+}
+
+void* shmgetdata(void* args){
+    while(1)
+    {
+        int shmid;
+
+        sem_p(sem_producer);
+        shmid = shmget((key_t)0x5505, 2000*sizeof(Ndata), 0660|IPC_CREAT);
+        if(shmid == -1)
+        {
+            printf("0x5505 已存在\n");
+        }
+
+        Ndata *pshm;
+
+        pshm = (Ndata*)shmat(shmid, 0, 0);
+        memcpy(ndata, pshm, ONETIMESIZE*sizeof(Ndata));
+        for(int i=0; i<ONETIMESIZE; i++){
+            if((ndata+i)->value==0)
+            {   printf("1共享内存空\n");
+                break;
+            }
+            printf("%s\n", (ndata+i)->name);
+            printf("%d\n", (ndata+i)->value);
+        }
+        sem_v(sem_consumer);
+
+        shmdt(pshm);
+    }
+
+}
+void* shmgetdataleft(void* args){
+    while(1)
+    {
+        int shmid;
+
+        sem_p(sem_producerleft);
+        shmid = shmget((key_t)0x5506, 2000*sizeof(Ndata), 0660|IPC_CREAT);
+        if(shmid == -1)
+        {
+            printf("0x5506 已存在\n");
+        }
+
+        Ndata *pshm;
+
+        pshm = (Ndata*)shmat(shmid, 0, 0);
+        memcpy(ndata, pshm, ONETIMESIZE*sizeof(Ndata));
+        for(int i=0; i<ONETIMESIZE; i++){
+            if((ndata+i)->value==0)
+            {   printf("2共享内存空\n");
+                break;
+            }
+            printf("%s\n", (ndata+i)->name);
+            printf("%d\n", (ndata+i)->value);
+        }
+        
+        sem_v(sem_consumerleft);
+
+        shmdt(pshm);
+    }
+
+}
+
+
+
+void get_str(char **str){
+    char *a = (char*)calloc(10, sizeof(char));
+    a = "fjjgl";
+    *
+    str = a;
+}
+void my_fgets(char *str, int size){
+    fgets(str, size, stdin);
+    char *find = strchr(str, '\n');
+    if(find){
+        *find = '\0';
+    }
+}
+
+int bits_10baseofnumber(int n){
+    int cnt = 0;
+    while(n)
+    {
+        n /= 10;
+        cnt++;
+    }
+    return cnt;
+}
+
+// 1a0930cae67f860d04f645f9a354795e3de8408ae17f845f0c51777118c54b5c8159d1edeca7a18888ca8edc4fd3c4a19ec9a9abd6af34072daaa9228fbbe1216698d3f542f331e02339d58f87be3082f1a224e4cb2882c0653f0531e89d575c85aeef048c341aad703c87925466e3cfb9385b5585cb37c96f7a7cbc452d8f0ad79a32a03ea34b4cbbccb51b658e4768864b95565cbef4ea5fbf6931636f1424eb2a1ed6214c07481963a8e9638a4d7e8639278c4398677d0312c1e55b07af582239206a0e4c2eaa42ceb0d14a5aa89f2c091f169643920f5e76e3a68cd118e48617ba88b86b1a5a70cde3cdadb0904cf30487db307a470aa8ce35713622faae30be0542be12c1c50de5ddcc290fd15d0f84f4ba55f48f06695adca0bea325b2f722180bef49b44104ed593f7e15682c8b6bc24b652e255567af9c453a8bf18e3beedf70e5e39b8876efa2fd0d03d17aa4eb9ec9f56c478d55fabe7f36c02753444677582379ebaefd0c7e27e8ae52f45b39d03201b96e974dce6302cda7b0325fef82574724b7b986f6a77a6bd1b3739a517364dc528ea81a251329c6f358f1ed49f9998b1e5c23e50c1da446ea4b10ca869dfb025cd90272502a06648de6e664bad4b5d248ddc7ee6a6723716bf099a121c8f68886c4e6282835f2c708052c3b2577328a4b552ffd1606d0b51ae3336925b9568f54b9f819d4cdd629e120481a0930cae67f860d04f645f9a354795e3de8408ae17f845f0c51777118c54b5c8159d1edeca7a18888ca8edc4fd3c4a19ec9a9abd6af34072daaa9228fbbe1216698d3f542f331e02339d58f87be3082f1a224e4cb2882c0653f0531e89d575c85aeef048c341aad703c87925466e3cfb9385b5585cb37c96f7a7cbc452d8f0ad79a32a03ea34b4cbbccb51b658e4768864b95565cbef4ea5fbf6931636f1424eb2a1ed6214c07481963a8e9638a4d7e8639278c4398677d0312c1e55b07af582239206a0e4c2eaa42ceb0d14a5aa89f2c091f169643920f5e76e3a68cd118e48617ba88b86b1a5a70cde3cdadb0904cf30487db307a470aa8ce35713622faae30be0542be12c1c50de5ddcc290fd15d0f84f4ba55f48f06695adca0bea325b2f722180bef49b44104ed593f7e15682c8b6bc24b652e255567af9c453a8bf18e3beedf70e5e39b8876efa2fd0d03d17aa4eb9ec9f56c478d55fabe7f36c02753444677582379ebaefd0c7e27e8ae52f45b39d03201b96e974dce6302cda7b0325fef82574724b7b986f6a77a6bd1b3739a517364dc528ea81a251329c6f358f1ed49f9998b1e5c23e50c1da446ea4b10ca869dfb025cd90272502a06648de6e664bad4b5d248ddc7ee6a6723716bf099a121c8f68886c4e6282835f2c708052c3b2577328a4b552ffd1606d0b51ae3336925b9568f54b9f819d4cdd629e00200
+// 1a0930cae67f860d04f645f9a354795e3de8408ae17f845f0c51777118c54b5c8159d1edeca7a18888ca8edc4fd3c4a19ec9a9abd6af34072daaa9228fbbe1216698d3f542f331e02339d58f87be3082f1a224e4cb2882c0653f0531e89d575c85aeef048c341aad703c87925466e3cfb9385b5585cb37c96f7a7cbc452d8f0ad79a32a03ea34b4cbbccb51b658e4768864b95565cbef4ea5fbf6931636f1424eb2a1ed6214c07481963a8e9638a4d7e8639278c4398677d0312c1e55b07af582239206a0e4c2eaa42ceb0d14a5aa89f2c091f169643920f5e76e3a68cd118e48617ba88b86b1a5a70cde3cdadb0904cf30487db307a470aa8ce35713622faae30be0542be12c1c50de5ddcc290fd15d0f84f4ba55f48f06695adca0bea325b2f722180bef49b44104ed593f7e15682c8b6bc24b652e255567af9c453a8bf18e3beedf70e5e39b8876efa2fd0d03d17aa4eb9ec9f56c478d55fabe7f36c02753444677582379ebaefd0c7e27e8ae52f45b39d03201b96e974dce6302cda7b0325fef82574724b7b986f6a77a6bd1b3739a517364dc528ea81a251329c6f358f1ed49f9998b1e5c23e50c1da446ea4b10ca869dfb025cd90272502a06648de6e664bad4b5d248ddc7ee6a6723716bf099a121c8f68886c4e6282835f2c708052c3b2577328a4b552ffd1606d0b51ae3336925b9568f54b9f819d4cdd629e1dce8a6eaece6c9733bf840d32c5dc462beffe5092d380285c1b2ed286ee237ae488939421d56a51e82bd6caad20dfc1756a95681b8fcfb9f2ccec90b2b1cdd9f29441f45fe3be7d9af17abbb7ad4372bb2a56755a68d892bc1985db870f5f8c3aa74992b562c6a8e05eb7e0ca51df6e3282613b18fc7b67d9e41dcc2df3d08397610c5d8a7dfa80b2992259ca45bdc214cb22dcc37431097fff3142837432ff3126af5a9954fd9390137bb24969f4894a41b09609b4b60c2373735629a4d79acd958a31310d7a5ce27889782148fba22d9096f3263013a3a438186eae2ce120f47f96d7b6f1912d616054ff6d9ce2af6e9f82be3c4714d438335de6a34d20a014b83a03afcdcb81702977a959b22cdeccd2d757d8640a3f56f54ee6499c901eb95217acc631eb6ba2018e83985f6af29b67dc844ebc7140fa9c1fc33073c4cb864f96fd2c12246234d21430b495f3afb53f1d672ab0fd7bc8f6a070f3158c5a05120a25443a829044a1652dbf825be4052f564e1416494544c1c069bbf5a60c0ce54048cc6855cf2d2a26c001400862f33f0292fa9bca5121c5eeae648dc2ac20ffcd6fb0bc421282b4927f693f874ff36db775a0dcd4b996869851d19b23bb406335b7abea655a783ae9f0779e3dcae48f35b193e34fdcf5d4e66b93caf0fd1f9c3b5f6384ac0dd3d5d6c01035ad8d7d1cd3014db47f901b56e702f8931d45f4888
+// 1a0930cae67f860d04f645f9a354795e3de8408ae17f845f0c51777118c54b5c8159d1edeca7a18888ca8edc4fd3c4a19ec9a9abd6af34072daaa9228fbbe1216698d3f542f331e02339d58f87be3082f1a224e4cb2882c0653f0531e89d575c85aeef048c341aad703c87925466e3cfb9385b5585cb37c96f7a7cbc452d8f0ad79a32a03ea34b4cbbccb51b658e4768864b95565cbef4ea5fbf6931636f1424eb2a1ed6214c07481963a8e9638a4d7e8639278c4398677d0312c1e55b07af582239206a0e4c2eaa42ceb0d14a5aa89f2c091f169643920f5e76e3a68cd118e48617ba88b86b1a5a70cde3cdadb0904cf30487db307a470aa8ce35713622faae30be0542be12c1c50de5ddcc290fd15d0f84f4ba55f48f06695adca0bea325b2f722180bef49b44104ed593f7e15682c8b6bc24b652e255567af9c453a8bf18e3beedf70e5e39b8876efa2fd0d03d17aa4eb9ec9f56c478d55fabe7f36c02753444677582379ebaefd0c7e27e8ae52f45b39d03201b96e974dce6302cda7b0325fef82574724b7b986f6a77a6bd1b3739a517364dc528ea81a251329c6f358f1ed49f9998b1e5c23e50c1da446ea4b10ca869dfb025cd90272502a06648de6e664bad4b5d248ddc7ee6a6723716bf099a121c8f68886c4e6282835f2c708052c3b2577328a4b552ffd1606d0b51ae3336925b9568f54b9f819d4cdd629e1
+// 10cd2afe12611e3bbef59e70b3f783503058b2d2b96c31d8f882855eb235d8bd50fbb188072d5bcb52ad57cbc37aabe8cb6155795d15ced80cb260055460a089f128da10fb0bbd8f40163f88256656a7202d9ad21ea3d35a6825ff670a1515bf7f3ed744e27bd67b700ba11bf9972c93367626e8aa8aafe12c7c216524e3d570842e9b88b23328b71f24cd8b6c615447a21d44d77267504c90810e021e59bfadf4efc1bebf65697f966ff9a0c4cc23e674fc2dcc82e64972a2349ef74f1065a438f4f15fe4b873527739226c0c8bd86a354ece38507c66fde01e1c51190c72720b56c5f6db7d2a499135a3dd3dc90fac9121ec983bf0b1b7e6645e2dde2be2f4ae5a9b46e5dde0a5b85d3e4e22914834fa5e30bc424df434932659da8f4868689308545f0f15d96945b0ffb22689a48be12c454036b26c7756c2db62847bd271d98102bd5b5e76158c32485bb40ad9b0216d60fb44a30b510b17a39597a9b33b108296681a0e20cf560fa79ae87d51c6dbc28f23121c4f7edac11c1e073d689c4591a8edc8a0c47a2a83eafd755dfc209fda38a69ac8ad7ed997420b23011b349cfd4091a20f3f4e74354718151787f4b8f6169cf6a5b7cddc3aa483b58b98d343a077ba697d462ceefb28ce5899f8fa9c61566e387fc9fcc9a0436dc4eb62d030a7d1f94d909ec1bfb4b553a49b1f990b5c78d96c0aceff7254717e3011204810cd2afe12611e3bbef59e70b3f783503058b2d2b96c31d8f882855eb235d8bd50fbb188072d5bcb52ad57cbc37aabe8cb6155795d15ced80cb260055460a089f128da10fb0bbd8f40163f88256656a7202d9ad21ea3d35a6825ff670a1515bf7f3ed744e27bd67b700ba11bf9972c93367626e8aa8aafe12c7c216524e3d570842e9b88b23328b71f24cd8b6c615447a21d44d77267504c90810e021e59bfadf4efc1bebf65697f966ff9a0c4cc23e674fc2dcc82e64972a2349ef74f1065a438f4f15fe4b873527739226c0c8bd86a354ece38507c66fde01e1c51190c72720b56c5f6db7d2a499135a3dd3dc90fac9121ec983bf0b1b7e6645e2dde2be2f4ae5a9b46e5dde0a5b85d3e4e22914834fa5e30bc424df434932659da8f4868689308545f0f15d96945b0ffb22689a48be12c454036b26c7756c2db62847bd271d98102bd5b5e76158c32485bb40ad9b0216d60fb44a30b510b17a39597a9b33b108296681a0e20cf560fa79ae87d51c6dbc28f23121c4f7edac11c1e073d689c4591a8edc8a0c47a2a83eafd755dfc209fda38a69ac8ad7ed997420b23011b349cfd4091a20f3f4e74354718151787f4b8f6169cf6a5b7cddc3aa483b58b98d343a077ba697d462ceefb28ce5899f8fa9c61566e387fc9fcc9a0436dc4eb62d030a7d1f94d909ec1bfb4b553a49b1f990b5c78d96c0aceff7254717e30100200
