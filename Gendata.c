@@ -10,7 +10,7 @@
 #include "my_semaphore.h"
 
 
-#define ONETIMESIZE 1000
+#define ONETIMESIZE 100
 #define SLEEPTIME 5000
 
 pthread_mutex_t mutex;
@@ -71,7 +71,7 @@ void* gen_contrl(void *args){
     int a;
     while(1)
     {
-        printf("输入1开始产生数据,输入0停止产生数据:");
+        printf("输入1开始产生数据,输入0停止产生数据,输入-1退出程序:");
         scanf("%d", &a);
 
         if(a == 1)
@@ -84,6 +84,9 @@ void* gen_contrl(void *args){
             flag = 0;
             sem_post(&sem_send);    //  单通道
             // sem_post(&sem_sendleft);     //  增加一个通道，发送末尾<ONETIMESIZE数据
+        }
+        if(a == -1){
+            exit(0);
         }
     }
 }
@@ -147,7 +150,7 @@ void* shmsend(void* args){
             p = pop(list_data);
             if(p == NULL)
             {
-              printf("1链表空\n");
+              printf("FIFO空\n");
               break;  
             }
             ndata = &p->data;

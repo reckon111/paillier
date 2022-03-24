@@ -11,8 +11,6 @@
 #include <gmp.h>
 #include <time.h>
 #include <sys/time.h>
-#include "dictionary.h"
-#include <mysql/mysql.h>
 #include <pthread.h>
 #include "paillier.h"
 
@@ -267,8 +265,8 @@ void secure_recv(int sock_cli, RECVD_MSG *recvd_msg){
                 strncpy(dmsg, data_buffer+HEADER_SIZE,size1);
                 recvd_msg->type = 1;
                 recvd_msg->data = dmsg;
-                printf("type:%s\n",s_t);
-                printf("%s\n",dmsg);
+                // printf("type:%s\n",s_t);
+                // printf("%s\n",dmsg);
                 memset(data_buffer,0,sizeof(data_buffer));
             }
         }
@@ -296,14 +294,9 @@ void secure_send(int fd, char* send_data){  // 避免数据过长，而数据发
         
         if(len == -1)
         {
-            // close(fd);
             printf("发送错误\n");
             return;
         }
-
-        // if(len == 0){
-        //     continue;
-        // }
 
         cnt += len;
         size -= len;
@@ -385,8 +378,8 @@ void* Query(void* args){
             printf("询问发送中...\n");
             secure_send(sock_cli, send_data);
             printf("询问发送成功\n");
-            printf("询问:");
-            puts(send_data);
+            // printf("询问:");
+            // puts(send_data);
 
             secure_recv(sock_cli,&recvd_msg);
 

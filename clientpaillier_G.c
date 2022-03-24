@@ -28,6 +28,7 @@
 #define MSG1BYTES_LEN 4 
 #define MSG2BYTES_LEN 4
 #define TYPE_LEN 1
+#define ONETIMESIZE 100
 
 struct rawdata{
     char name[NAMESIZE];
@@ -67,7 +68,6 @@ typedef struct{
     char mu[KEYSIZE/4+10];
 }Share_data;
 
-#define ONETIMESIZE 1000
 
 Ndata ndata[ONETIMESIZE];
 int sem_consumer;
@@ -175,9 +175,6 @@ char* encode_msg(int type, char* msg1, char* msg2){ //函数使用结束后需�
     strcat(encode_msg, msg2);
     return encode_msg;
 }
-
-
-
 
 
 
