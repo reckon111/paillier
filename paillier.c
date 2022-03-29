@@ -45,7 +45,6 @@ void get_p(mpz_t p, int n){
 }
 
 
-
 void get_randr(mpz_t r, mpz_t n){
     unsigned long seed;
     gmp_randstate_t state;
@@ -82,9 +81,13 @@ void key_generate(mpz_t pk_n, mpz_t pk_g, mpz_t sk_lambda, mpz_t sk_mu, int keys
         while(mpz_cmp(p,q) == 0){
             get_nbits_randprime(q, keysize/2);
         }
-        // gmp_printf("p: %Zd\n", p);
-        // gmp_printf("q: %Zd\n", q);
-        mpz_mul(pk_n, p, q);  
+        mpz_mul(pk_n, p, q); 
+
+		if(mpz_sizeinbase(pk_n, 2)!=keysize)
+		{
+			continue;
+		} 
+
         mpz_sub_ui(p, p, 1);    // p=p-1
         mpz_sub_ui(q, q, 1);    // q=q-1
         mpz_mul(sk_lambda, p, q);
@@ -159,6 +162,55 @@ unsigned long decipher( mpz_t encipher_msg, mpz_t n ,mpz_t lambda, mpz_t mu){
     return decipher_msg;
 }
 
+void mpz_encipher(mpz_t encipher_msg, mpz_t n, mpz_t g, mpz_t m){
+    mpz_t r;
+    mpz_t gpowm;
+    mpz_t rpown;
+    mpz_t npow2;
+    mpz_t temp;
+
+    mpz_init(r);
+    mpz_init(gpowm);
+    mpz_init(rpown);
+    mpz_init(npow2);
+    mpz_init(temp);
+
+    get_randr(r, n);
+    mpz_pow_ui(npow2, n, 2);
+    mpz_powm(gpowm, g, m, npow2);  //改这
+    mpz_powm(rpown, r, n, npow2);
+    mpz_mul(temp, gpowm, rpown);
+    mpz_mod(encipher_msg, temp, npow2);
+
+    mpz_clear(r);
+    mpz_clear(gpowm);
+    mpz_clear(rpown);
+    mpz_clear(npow2);
+    mpz_clear(temp);
+
+    return;
+}
+
+void mpz_decipher(mpz_t encipher_msg, mpz_t decipher_msg, mpz_t n ,mpz_t lambda, mpz_t mu){
+    mpz_t temp;
+    mpz_t npow2;
+
+    mpz_init(temp);
+    mpz_init(npow2);
+
+    mpz_pow_ui(npow2, n, 2);
+    mpz_powm(temp, encipher_msg, lambda, npow2);
+    mpz_sub_ui(temp, temp, 1);
+    mpz_fdiv_q(temp, temp, n);
+    mpz_mul(temp, temp, mu);
+    mpz_mod(temp, temp, n);
+
+    mpz_set(decipher_msg, temp);
+
+    mpz_clear(temp);
+    mpz_clear(npow2);
+}
+
 void key_generate_G(mpz_t pk_n, mpz_t pk_g, mpz_t hs, mpz_t sk_lambda, mpz_t sk_mu, int keysize){
     mpz_t p, q, gcd_2, p_1, q_1, x, h, npow2;
     mpz_init(gcd_2);
@@ -171,20 +223,27 @@ void key_generate_G(mpz_t pk_n, mpz_t pk_g, mpz_t hs, mpz_t sk_lambda, mpz_t sk_
     mpz_init(npow2);
  
     // get pk_n,sk_lambda and gcd(pk_n,sk_lambda)==1
-    
-    get_p(p, keysize/2);
-    mpz_sub_ui(p_1, p, 1);    // p=p-1
-    while(1){
-        get_p(q, keysize/2);
-        mpz_sub_ui(q_1, q, 1);
-        mpz_gcd(gcd_2,p_1, q_1);
-        if(mpz_cmp_ui(gcd_2, 2) == 0){
-            break;
-        }
-    }
+    while(1)
+	{
+		get_p(p, keysize/2);
+		mpz_sub_ui(p_1, p, 1);    // p=p-1
+		while(1){
+			get_p(q, keysize/2);
+			mpz_sub_ui(q_1, q, 1);
+			mpz_gcd(gcd_2,p_1, q_1);
+			if(mpz_cmp_ui(gcd_2, 2) == 0){
+				break;
+			}
+		}
+		mpz_mul(pk_n, p, q); 
+		if(mpz_sizeinbase(pk_n, 2) == keysize)
+		{
+			break;
+		} 		
+	}
 
     
-    mpz_mul(pk_n, p, q);  
+
     mpz_pow_ui(npow2, pk_n, 2);
 
     get_randr(x, pk_n);
@@ -223,8 +282,11 @@ void encipher_G(mpz_t encipher_msg, mpz_t n, mpz_t g, mpz_t hs, unsigned long m)
     mpz_init(temp);
 
     mpz_pow_ui(npow2, n, 2);
-    get_nbits_randnumb(a, (mpz_sizeinbase(n,2)+1)/2/2);
-    
+
+    get_nbits_randnumb(a, (mpz_sizeinbase(n,2)+1)/2);	//	(mpz_sizeinbase(n,2)+1)/2/2
+    // int a_size = mpz_sizeinbase(a, 2);
+	// printf("a_size:%d\n",a_size);
+
     mpz_mul_ui(gpowm, n, m);      
     mpz_add_ui(gpowm, gpowm, 1);
 
@@ -240,6 +302,7 @@ void encipher_G(mpz_t encipher_msg, mpz_t n, mpz_t g, mpz_t hs, unsigned long m)
 
     return;
 }
+
 
 unsigned long decipher_G( mpz_t encipher_msg, mpz_t n ,mpz_t lambda, mpz_t mu){
     unsigned long decipher_msg;
@@ -293,4 +356,59 @@ void get_nbits_randnumb(mpz_t randnumb, int n){
     mpz_clear(tmpmax);
     gmp_randclear(state);
     return;
+}
+
+void mpz_encipher_G(mpz_t encipher_msg, mpz_t n, mpz_t g, mpz_t hs, mpz_t m){
+    mpz_t a;
+    mpz_t gpowm;
+    mpz_t hspowa;
+    mpz_t npow2;
+    mpz_t temp;
+
+    mpz_init(a);
+    mpz_init(gpowm);
+    mpz_init(hspowa);
+    mpz_init(npow2);
+    mpz_init(temp);
+
+    mpz_pow_ui(npow2, n, 2);
+    get_nbits_randnumb(a, (mpz_sizeinbase(n,2)+1)/2);
+    // int a_size = mpz_sizeinbase(a, 2);
+	// printf("a_size:%d\n",a_size);
+
+    mpz_mul(gpowm, n, m);       //改这
+    mpz_add_ui(gpowm, gpowm, 1);
+
+    mpz_powm(hspowa, hs, a, npow2);
+    mpz_mul(temp, gpowm, hspowa);
+    mpz_mod(encipher_msg, temp, npow2);
+
+    mpz_clear(a);
+    mpz_clear(gpowm);
+    mpz_clear(hspowa);
+    mpz_clear(npow2);
+    mpz_clear(temp);
+
+    return;
+}
+
+void mpz_decipher_G(mpz_t decipher_msg, mpz_t encipher_msg, mpz_t n ,mpz_t lambda, mpz_t mu){
+    mpz_t temp;
+    mpz_t npow2;
+
+    mpz_init(temp);
+    mpz_init(npow2);
+
+    mpz_pow_ui(npow2, n, 2);
+    
+    mpz_powm(temp, encipher_msg, lambda, npow2);
+    mpz_sub_ui(temp, temp, 1);
+    mpz_fdiv_q(temp, temp, n);
+    mpz_mul(temp, temp, mu);
+    mpz_mod(temp, temp, n);
+
+	mpz_set(decipher_msg, temp);
+
+	mpz_clear(temp);
+    mpz_clear(npow2);
 }

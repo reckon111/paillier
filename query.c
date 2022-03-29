@@ -94,15 +94,6 @@ int main()
 
     Share_data share_data;
     shareget(&share_data);
-    // printf("share_data.n:%s\n",share_data.n);
-    // printf("share_data.g:%s\n",share_data.g);
-    // printf("share_data.hs:%s\n",share_data.hs);
-    // printf("share_data.lambda:%s\n",share_data.lambda);
-    // printf("share_data.mu:%s\n",share_data.mu);
-    // puts(share_data.g);
-    // puts(share_data.hs);
-    // puts(share_data.lambda);
-    // puts(share_data.mu);
 
     mpz_set_str(pk_n, share_data.n, BASE);
     mpz_set_str(pk_g, share_data.g, BASE);
@@ -112,25 +103,10 @@ int main()
 
     mpz_pow_ui(npow2, pk_n, 2);
 
-    // mpz_set(pk_n, share_data.n);
-    // mpz_set(pk_g, share_data.g);
-
-    // gmp_printf("pk_n:%Zd\n", pk_n);
-    // gmp_printf("pk_g:%Zd\n", pk_g);
-    // gmp_printf("sk_lambda:%Zd\n", sk_lambda);
-    // gmp_printf("sk_mu:%Zd\n", sk_mu);
 
     Query_args args_query = {&pk_n, &sk_lambda, &sk_mu, &npow2};
 
     Query(&args_query);
-    // pthread_t th_SendData, th_Query;
-
-    // pthread_create(&th_Query, NULL, Query, &args_query);
-    
-    // pthread_join(th_Query, NULL);
-
-    
-    
   
     /*————————————clear mpz————————————*/
     mpz_clear(pk_n);
@@ -348,7 +324,7 @@ void* Query(void* args){
         perror("connect");
         exit(1);
     }
-
+	printf("连接服务器成功\n");
 
     while(1)
     {   char elemt1[bits_10baseofnumber(DATASIZE)+2], elemt2[bits_10baseofnumber(DATASIZE)+2], operation[10];
@@ -425,15 +401,6 @@ void shareget(Share_data* share_data){
 
     memcpy(share_data, pshm, sizeof(Share_data));
 
-    // gmp_printf("pk_n:%Zd\n", pshm->g);
-    // gmp_printf("pk_n:%Zd\n", share_data->n);
-    // printf("%d\n", share_data->a);
-    // printf("%d\n", pshm->b);
-    // printf("pshm->n:%s\n",pshm->n);
-    // printf("pshm->g:%s\n",pshm->g);
-    // printf("pshm->hs:%s\n",pshm->hs);
-    // printf("pshm->lambda:%s\n",pshm->lambda);
-    // printf("pshm->mu:%s\n",pshm->mu);
     shmdt(pshm);
 }
 
